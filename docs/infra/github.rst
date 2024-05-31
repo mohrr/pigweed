@@ -4,9 +4,8 @@
 GitHub
 ===========
 
---------
 Overview
---------
+========
 
 Pigweed itself uses `LUCI <luci>`_ for
 :abbr:`CI/CD (Continuous Integration/Continuous Deployment)`. LUCI is
@@ -63,5 +62,41 @@ the root of the checkout.
 
 ``pw presubmit``
 ================
-Tests that require using `pw_env_setup <module-pw_env_setup>`_ and
-`pw_presubmit <module-pw_presubmit>`_ are not yet supported.
+Configuring a builder that uses `pw_env_setup <module-pw_env_setup>`_ and
+`pw_presubmit <module-pw_presubmit>`_ is also relatively simple. When run
+locally, ``bootstrap.sh`` has several checks to ensure it's "sourced" instead of
+directly executed. A trivial wrapper script is included in ``pw_env_setup`` that
+gets around this.
+
+When ``pw_env_setup`` is run within a GitHub Action, it recognizes this from the
+environment and writes the environment variables in a way
+`understood by GitHub <github-actions-env-var>`_, and GitHub makes those
+variables available to subsequent steps.
+
+.. _github-actions-env-var: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+
+For Pigweed itself, the only ``pw_presubmit``-based action runs lintformat. To
+test all of Pigweed requires more resources than the free GitHub runners
+provide, but small projects using just part of Pigweed may be more successful.
+
+.. code-block:: yaml
+
+   name: lintformat
+
+   on:
+     pull_request:
+       types: [opened, synchronize, reopened]
+
+   jobs:
+     bazel-build-test:
+       runs-on: ubuntu-latest
+       steps:
+         - name: Checkout
+           uses: actions/checkout@v4
+           with:
+             fetch-depth: 0
+             submodules: recursive
+         - name: Bootstrap
+           run: pw_env_setup/run.sh bootstrap.sh
+         - name: python_format
+           run: pw presubmit --program lintformat --keep-going
